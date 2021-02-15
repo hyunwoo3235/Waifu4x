@@ -35,7 +35,7 @@ class NLayerDiscriminator(tf.keras.Model, ABC):
 
 
 class Discriminator_VGG_128(tf.keras.Model, ABC):
-    def __init__(self, nf=64):
+    def __init__(self, nf=4):
         super(Discriminator_VGG_128, self).__init__()
 
         self.conv0_0 = Conv2D(nf, kernel_size=3, padding='same')
@@ -44,30 +44,30 @@ class Discriminator_VGG_128(tf.keras.Model, ABC):
         # [64, 64, 64]
         self.conv1_0 = Conv2D(nf * 2, kernel_size=3, padding='same')
         self.bn1_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
-        self.conv1_1 = Conv2D(nf * 2, kernel_size=3, padding='same')
+        self.conv1_1 = Conv2D(1, kernel_size=3, padding='same')
         self.bn1_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
         # [128, 32, 32]
-        self.conv2_0 = Conv2D(nf * 4, kernel_size=3, padding='same')
-        self.bn2_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
-        self.conv2_1 = Conv2D(nf * 4, kernel_size=4, padding='same')
-        self.bn2_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
+        # self.conv2_0 = Conv2D(nf * 4, kernel_size=3, padding='same')
+        # self.bn2_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
+        # self.conv2_1 = Conv2D(nf * 4, kernel_size=4, padding='same')
+        # self.bn2_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
         # [256, 16, 16]
-        self.conv3_0 = Conv2D(nf * 8, kernel_size=3, padding='same')
-        self.bn3_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
-        self.conv3_1 = Conv2D(nf * 8, kernel_size=4, padding='same')
-        self.bn3_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
+        # self.conv3_0 = Conv2D(nf * 8, kernel_size=3, padding='same')
+        # self.bn3_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
+        # self.conv3_1 = Conv2D(nf * 8, kernel_size=4, padding='same')
+        # self.bn3_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
         # [512, 8, 8]
-        self.conv4_0 = Conv2D(nf * 8, kernel_size=3, padding='same')
-        self.bn4_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
-        self.conv4_1 = Conv2D(nf * 8, kernel_size=4, padding='same')
-        self.bn4_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
+        # self.conv4_0 = Conv2D(nf * 2, kernel_size=3, padding='same')
+        # self.bn4_0 = BatchNormalization(momentum=0.1, epsilon=1e-05)
+        # self.conv4_1 = Conv2D(32, kernel_size=4, padding='same')
+        # self.bn4_1 = BatchNormalization(momentum=0.1, epsilon=1e-05)
 
         self.flatten = Flatten()
         self.linear1 = Dense(100)
         self.linear2 = Dense(1)
 
         # activation function
-        self.lrelu = LeakyReLU(negative_slope=0.2, inplace=True)
+        self.lrelu = LeakyReLU(0.2)
 
     def call(self, x, training=None, mask=None):
         fea = self.lrelu(self.conv0_0(x))
@@ -76,14 +76,14 @@ class Discriminator_VGG_128(tf.keras.Model, ABC):
         fea = self.lrelu(self.bn1_0(self.conv1_0(fea)))
         fea = self.lrelu(self.bn1_1(self.conv1_1(fea)))
 
-        fea = self.lrelu(self.bn2_0(self.conv2_0(fea)))
-        fea = self.lrelu(self.bn2_1(self.conv2_1(fea)))
+        # fea = self.lrelu(self.bn2_0(self.conv2_0(fea)))
+        # fea = self.lrelu(self.bn2_1(self.conv2_1(fea)))
 
-        fea = self.lrelu(self.bn3_0(self.conv3_0(fea)))
-        fea = self.lrelu(self.bn3_1(self.conv3_1(fea)))
+        # fea = self.lrelu(self.bn3_0(self.conv3_0(fea)))
+        # fea = self.lrelu(self.bn3_1(self.conv3_1(fea)))
 
-        fea = self.lrelu(self.bn4_0(self.conv4_0(fea)))
-        fea = self.lrelu(self.bn4_1(self.conv4_1(fea)))
+        # fea = self.lrelu(self.bn4_0(self.conv4_0(fea)))
+        # fea = self.lrelu(self.bn4_1(self.conv4_1(fea)))
 
         fea = self.flatten(fea)
         fea = self.lrelu(self.linear1(fea))
@@ -95,10 +95,10 @@ class VGGFeatureExtractor(tf.keras.Model, ABC):
     def __init__(self, feature_layer=34, use_input_norm=True):
         super(VGGFeatureExtractor, self).__init__()
         self.use_input_norm = use_input_norm
-        model = VGG19()
+        model = VGG19(input_shape=(256, 256, 3))
 
-        mean = tf.constant([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
-        std = tf.constant([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+        mean = tf.constant([[[[0.485]], [[0.456]], [[0.406]]]])
+        std = tf.constant([[[[0.229]], [[0.224]], [[0.225]]]])
         self.register_buffer('mean', mean)
         self.register_buffer('std', std)
 
