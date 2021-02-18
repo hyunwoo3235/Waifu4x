@@ -15,6 +15,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str)
     parser.add_argument('-load', type=str, default='')
+    parser.add_argument('-data', type=str, default='path')
+    parser.add_argument('-nblock', type=int, default=23)
     args = parser.parse_args()
 
     writer = SummaryWriter(log_dir='../tensorboard')
@@ -22,7 +24,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     netG = RRDBNet_arch.RRDBNet(in_nc=3, out_nc=3,
-                                nf=64, nb=13).to(device)
+                                nf=64, nb=args.nblock).to(device)
     netD = SRGAN_arch.NLayerDiscriminator(input_nc=3, ndf=3, n_layers=3).to(device)
     netF = SRGAN_arch.VGGFeatureExtractor(feature_layer=34, use_bn=False,
                                           use_input_norm=True, device=device)
@@ -56,11 +58,11 @@ def main():
 
     for optimizer in optimizers:
         schedulers.append(MultiStepLR(optimizer,
-                                      milestones=[5000, 10000, 20000, 30000],
+                                      milestones=[100, 500, 1000, 1500, 2000, 2500, 3000],
                                       gamma=0.5))
 
-    train_set = ImageDataset('dataset_opt')
-    train_loader = DataLoader(train_set, batch_size=16, shuffle=True)
+    train_set = ImageDataset("path")
+    train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
 
     current_step = 0
 
