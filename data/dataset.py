@@ -35,6 +35,6 @@ class ImageDataset(data.Dataset):
 
     def __getitem__(self, index):
         img = Image.open(self.x[index])
-        HR = self.transform(img)
-        LR = self.resize(HR)
-        return HR, LR
+        GT = self.transform(img)
+        LR = self.resize(GT)
+        return {'GT': GT, 'LR': LR}

@@ -1,6 +1,10 @@
 import argparse
 import torch
 import torch.nn as nn
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -23,13 +27,13 @@ def main():
 
     writer = SummaryWriter(log_dir='../tensorboard')
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = xm.xla_device()
 
     netG = RRDBNet_arch.RRDBNet(in_nc=3, out_nc=3,
                                 nf=64, nb=args.nblock).to(device)
     netD = SRGAN_arch.NLayerDiscriminator(input_nc=3, ndf=3, n_layers=3).to(device)
     netF = SRGAN_arch.VGGFeatureExtractor(feature_layer=34, use_bn=False,
-                                          use_input_norm=True, device=device)
+                                          use_input_norm=True).to(device)
     netF.eval()
     netG.train()
     netD.train()
@@ -63,11 +67,13 @@ def main():
                                       milestones=[100, 500, 1000, 1500, 2000, 2500, 3000],
                                       gamma=0.5))
 
-    train_set = ImageDataset("path")
-    train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
+    train_set = ImageDataset(args.data)
+    train_loader = DataLoader(train_set, batch_size=32,
+                              shuffle=True, drop_last=True)
 
     for epoch in range(50):
-        for step, train_data in tqdm(train_loader):
+        para_train_loader = pl.ParallelLoader(train_loader, [device]).per_device_loader(device)
+        for step, train_data in tqdm(para_train_loader):
 
             var_L = train_data['LR'].to(device)
             var_H = train_data['GT'].to(device)
@@ -97,21 +103,20 @@ def main():
             l_g_total += l_g_gan
 
             l_g_total.backward()
-            optimizer_G.step()
+            xm.optimizer_step(optimizer_G)
 
-            # 이제 D
             for p in netD.parameters():
                 p.requires_grad = True
 
             optimizer_D.zero_grad()
             pred_d_real = netD(var_ref)
-            pred_d_fake = netD(fake_H.detach())  # detach to avoid BP to G
+            pred_d_fake = netD(fake_H.detach())
             l_d_real = cri_gan(pred_d_real - torch.mean(pred_d_fake), True)
             l_d_fake = cri_gan(pred_d_fake - torch.mean(pred_d_real), False)
             l_d_total = (l_d_real + l_d_fake) / 2
 
             l_d_total.backward()
-            optimizer_D.step()
+            xm.optimizer_step(optimizer_D)
 
             for scheduler in schedulers:
                 scheduler.step()
@@ -126,6 +131,13 @@ def main():
                 writer.add_scalar('D_real', torch.mean(pred_d_real.detach()))
                 writer.add_scalar('D_fake', torch.mean(pred_d_fake.detach()))
 
+                if step % 10000 == 0:
+                    torch.save(netG.parameters(), f'netG{epoch}-{step}.pth')
+                    torch.save(netD.parameters(), f'netG{epoch}-{step}.pth')
+
+        torch.save(netG.parameters(), f'netG{epoch}.pth')
+        torch.save(netD.parameters(), f'netG{epoch}.pth')
+
 
 if __name__ == '__main__':
-    main()
+    xmp.spawn(main, nprocs=8, start_method='fork')
